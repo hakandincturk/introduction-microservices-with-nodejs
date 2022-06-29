@@ -41,6 +41,7 @@ var cors = require("cors");
 var typeorm_1 = require("typeorm");
 var amqp = require("amqplib/callback_api");
 var Product_1 = require("./entity/Product");
+var axios_1 = require("axios");
 var consola = require('consola');
 (0, typeorm_1.createConnection)().then(function (db) {
     var productRepository = db.getMongoRepository(Product_1.Product);
@@ -84,8 +85,87 @@ var consola = require('consola');
                 });
             }); }, { noAck: true });
             channel.consume('product_updated', function (msg) { return __awaiter(void 0, void 0, void 0, function () {
+                var eventProduct, product, dbError_2;
                 return __generator(this, function (_a) {
-                    return [2 /*return*/];
+                    switch (_a.label) {
+                        case 0:
+                            _a.trys.push([0, 3, , 4]);
+                            eventProduct = JSON.parse(msg.content.toString());
+                            return [4 /*yield*/, productRepository.findOne({ admin_id: parseInt(eventProduct.id) })];
+                        case 1:
+                            product = _a.sent();
+                            productRepository.merge(product, {
+                                title: eventProduct.title,
+                                image: eventProduct.image,
+                                likes: eventProduct.likes
+                            });
+                            return [4 /*yield*/, productRepository.save(product)];
+                        case 2:
+                            _a.sent();
+                            consola.success({ message: "product updated, ".concat(product.id), badge: true });
+                            return [3 /*break*/, 4];
+                        case 3:
+                            dbError_2 = _a.sent();
+                            consola.error({ message: "product not updated, ".concat(dbError_2.message), badge: true });
+                            return [3 /*break*/, 4];
+                        case 4: return [2 /*return*/];
+                    }
+                });
+            }); }, { noAck: true });
+            channel.consume('product_deleted', function (msg) { return __awaiter(void 0, void 0, void 0, function () {
+                var admin_id, dbError_3;
+                return __generator(this, function (_a) {
+                    switch (_a.label) {
+                        case 0:
+                            _a.trys.push([0, 2, , 3]);
+                            admin_id = parseInt(msg.content.toString());
+                            return [4 /*yield*/, productRepository.deleteOne({ admin_id: admin_id })];
+                        case 1:
+                            _a.sent();
+                            consola.success({ message: "product deleted, ".concat(admin_id), badge: true });
+                            return [3 /*break*/, 3];
+                        case 2:
+                            dbError_3 = _a.sent();
+                            consola.error({ message: "product not deleted, ".concat(dbError_3.message), badge: true });
+                            return [3 /*break*/, 3];
+                        case 3: return [2 /*return*/];
+                    }
+                });
+            }); }, { noAck: true });
+            app.get('/api/products', function (req, res) { return __awaiter(void 0, void 0, void 0, function () {
+                var products;
+                return __generator(this, function (_a) {
+                    switch (_a.label) {
+                        case 0: return [4 /*yield*/, productRepository.find()];
+                        case 1:
+                            products = _a.sent();
+                            return [2 /*return*/, res.send(products)];
+                    }
+                });
+            }); });
+            app.post('/api/products/:id/like', function (req, res) { return __awaiter(void 0, void 0, void 0, function () {
+                var product, dbError_4;
+                return __generator(this, function (_a) {
+                    switch (_a.label) {
+                        case 0:
+                            _a.trys.push([0, 4, , 5]);
+                            return [4 /*yield*/, productRepository.findOne({ where: { id: req.params.id } })];
+                        case 1:
+                            product = _a.sent();
+                            return [4 /*yield*/, axios_1.default.post("http://localhost:8000/api/products/".concat(product.admin_id, "/like"), {})];
+                        case 2:
+                            _a.sent();
+                            product.likes++;
+                            return [4 /*yield*/, productRepository.save(product)];
+                        case 3:
+                            _a.sent();
+                            return [2 /*return*/, res.json({ type: true, message: 'succesfull', data: product })];
+                        case 4:
+                            dbError_4 = _a.sent();
+                            consola.error({ message: "product not deleted, ".concat(dbError_4.message), badge: true });
+                            return [3 /*break*/, 5];
+                        case 5: return [2 /*return*/];
+                    }
                 });
             }); });
             app.listen(8001, function () {

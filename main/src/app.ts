@@ -5,6 +5,7 @@ import * as cors from 'cors'
 import { createConnection } from 'typeorm'
 import * as amqp from 'amqplib/callback_api'
 import { Product } from './entity/Product';
+import axios from 'axios';
 
 const consola = require('consola');
 
@@ -52,8 +53,56 @@ createConnection().then(db => {
       }, { noAck: true });
 
       channel.consume('product_updated', async (msg) => {
+        try {
+          const eventProduct: Product = JSON.parse(msg.content.toString())
 
-      });
+          const product = await productRepository.findOne({ admin_id: parseInt(eventProduct.id) });
+
+          productRepository.merge(product, {
+            title: eventProduct.title,
+            image: eventProduct.image,
+            likes: eventProduct.likes
+          })
+
+          await productRepository.save(product)
+          consola.success({ message: `product updated, ${product.id}`, badge: true });
+
+        } catch (dbError) {
+          consola.error({ message: `product not updated, ${dbError.message}`, badge: true });
+        }
+      }, { noAck: true });
+
+      channel.consume('product_deleted', async (msg) => {
+        try {
+          const admin_id = parseInt(msg.content.toString());
+          await productRepository.deleteOne({ admin_id });
+
+          consola.success({ message: `product deleted, ${admin_id}`, badge: true });
+
+        } catch (dbError) {
+          consola.error({ message: `product not deleted, ${dbError.message}`, badge: true });
+        }
+      }, { noAck: true })
+
+      app.get('/api/products', async (req: Request, res: Response) => {
+        const products = await productRepository.find();
+
+        return res.send(products);
+      })
+
+      app.post('/api/products/:id/like', async (req: Request, res: Response) => {
+        try {
+          const product = await productRepository.findOne({ where: { id: req.params.id } })
+
+          await axios.post(`http://localhost:8000/api/products/${product.admin_id}/like`, {})
+          product.likes++;
+          await productRepository.save(product)
+          return res.json({ type: true, message: 'succesfull', data: product });
+
+        } catch (dbError) {
+          consola.error({ message: `product not deleted, ${dbError.message}`, badge: true });
+        }
+      })
 
 
       app.listen(8001, () => {
