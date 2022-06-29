@@ -41,142 +41,159 @@ var express = require("express");
 var cors = require("cors");
 var typeorm_1 = require("typeorm");
 var Product_1 = require("./entity/Product");
+var amqp = require("amqplib/callback_api");
+var consola = require('consola');
 (0, typeorm_1.createConnection)().then(function (db) {
     var productRepository = db.getRepository(Product_1.Product);
-    var app = express();
-    app.use(cors({
-        origin: ['http://localhost:3000', 'http://localhost:8080', 'http://localhost:4200',]
-    }));
-    app.use(express.json());
-    app.get('/api/products', function (req, res) { return __awaiter(void 0, void 0, void 0, function () {
-        var products, error_1;
-        return __generator(this, function (_a) {
-            switch (_a.label) {
-                case 0:
-                    _a.trys.push([0, 2, , 3]);
-                    return [4 /*yield*/, productRepository.find()];
-                case 1:
-                    products = _a.sent();
-                    res.json({ type: true, data: products });
-                    return [3 /*break*/, 3];
-                case 2:
-                    error_1 = _a.sent();
-                    res.json({ type: false, data: error_1.message });
-                    return [3 /*break*/, 3];
-                case 3: return [2 /*return*/];
-            }
+    amqp.connect('amqps://nztaiger:Lun5OT9tHUlr2ZizcqsiTN_0bJ06qLgR@cow.rmq2.cloudamqp.com/nztaiger', function (error0, connection) {
+        if (error0)
+            throw error0;
+        connection.createChannel(function (error1, channel) {
+            if (error1)
+                throw error1;
+            var app = express();
+            app.use(cors({
+                origin: ['http://localhost:3000', 'http://localhost:8080', 'http://localhost:4200',]
+            }));
+            app.use(express.json());
+            app.get('/api/products', function (req, res) { return __awaiter(void 0, void 0, void 0, function () {
+                var products, error_1;
+                return __generator(this, function (_a) {
+                    switch (_a.label) {
+                        case 0:
+                            _a.trys.push([0, 2, , 3]);
+                            return [4 /*yield*/, productRepository.find()];
+                        case 1:
+                            products = _a.sent();
+                            res.json({ type: true, data: products });
+                            return [3 /*break*/, 3];
+                        case 2:
+                            error_1 = _a.sent();
+                            res.json({ type: false, data: error_1.message });
+                            return [3 /*break*/, 3];
+                        case 3: return [2 /*return*/];
+                    }
+                });
+            }); });
+            app.post('/api/products', function (req, res) { return __awaiter(void 0, void 0, void 0, function () {
+                var product, result, error_2;
+                return __generator(this, function (_a) {
+                    switch (_a.label) {
+                        case 0:
+                            _a.trys.push([0, 3, , 4]);
+                            return [4 /*yield*/, productRepository.create({
+                                    title: req.body.title,
+                                    image: req.body.image
+                                })];
+                        case 1:
+                            product = _a.sent();
+                            return [4 /*yield*/, productRepository.save(product)];
+                        case 2:
+                            result = _a.sent();
+                            channel.sendToQueue('product_created', Buffer.from(JSON.stringify(result)));
+                            res.json({ type: true, data: result });
+                            return [3 /*break*/, 4];
+                        case 3:
+                            error_2 = _a.sent();
+                            res.json({ type: false, data: error_2.message });
+                            return [3 /*break*/, 4];
+                        case 4: return [2 /*return*/];
+                    }
+                });
+            }); });
+            app.get('/api/products/:id', function (req, res) { return __awaiter(void 0, void 0, void 0, function () {
+                var product, error_3;
+                return __generator(this, function (_a) {
+                    switch (_a.label) {
+                        case 0:
+                            _a.trys.push([0, 2, , 3]);
+                            return [4 /*yield*/, productRepository.findOne({ where: { id: parseInt(req.params.id, 10) } })];
+                        case 1:
+                            product = _a.sent();
+                            res.json({ type: true, data: product });
+                            return [3 /*break*/, 3];
+                        case 2:
+                            error_3 = _a.sent();
+                            res.json({ type: false, data: error_3.message });
+                            return [3 /*break*/, 3];
+                        case 3: return [2 /*return*/];
+                    }
+                });
+            }); });
+            app.put('/api/products/:id', function (req, res) { return __awaiter(void 0, void 0, void 0, function () {
+                var product, result, error_4;
+                return __generator(this, function (_a) {
+                    switch (_a.label) {
+                        case 0:
+                            _a.trys.push([0, 3, , 4]);
+                            return [4 /*yield*/, productRepository.findOne({ where: { id: parseInt(req.params.id, 10) } })];
+                        case 1:
+                            product = _a.sent();
+                            productRepository.merge(product, req.body);
+                            return [4 /*yield*/, productRepository.save(product)];
+                        case 2:
+                            result = _a.sent();
+                            channel.sendToQueue('product_updated', Buffer.from(JSON.stringify(result)));
+                            res.json({ type: true, data: result });
+                            return [3 /*break*/, 4];
+                        case 3:
+                            error_4 = _a.sent();
+                            res.json({ type: false, data: error_4.message });
+                            return [3 /*break*/, 4];
+                        case 4: return [2 /*return*/];
+                    }
+                });
+            }); });
+            app.delete('/api/products/:id', function (req, res) { return __awaiter(void 0, void 0, void 0, function () {
+                var result, error_5;
+                return __generator(this, function (_a) {
+                    switch (_a.label) {
+                        case 0:
+                            _a.trys.push([0, 2, , 3]);
+                            return [4 /*yield*/, productRepository.delete(req.params.id)];
+                        case 1:
+                            result = _a.sent();
+                            channel.sendToQueue('product_deleted', Buffer.from(req.params.id));
+                            res.json({ type: true, data: result });
+                            return [3 /*break*/, 3];
+                        case 2:
+                            error_5 = _a.sent();
+                            res.json({ type: false, data: error_5.message });
+                            return [3 /*break*/, 3];
+                        case 3: return [2 /*return*/];
+                    }
+                });
+            }); });
+            app.post('/api/products/:id/like', function (req, res) { return __awaiter(void 0, void 0, void 0, function () {
+                var product, result, error_6;
+                return __generator(this, function (_a) {
+                    switch (_a.label) {
+                        case 0:
+                            _a.trys.push([0, 3, , 4]);
+                            return [4 /*yield*/, productRepository.findOne({ where: { id: parseInt(req.params.id, 10) } })];
+                        case 1:
+                            product = _a.sent();
+                            product.likes++;
+                            return [4 /*yield*/, productRepository.save(product)];
+                        case 2:
+                            result = _a.sent();
+                            res.json({ type: true, data: result });
+                            return [3 /*break*/, 4];
+                        case 3:
+                            error_6 = _a.sent();
+                            res.json({ type: false, data: error_6.message });
+                            return [3 /*break*/, 4];
+                        case 4: return [2 /*return*/];
+                    }
+                });
+            }); });
+            app.listen(8000, function () {
+                consola.success({ message: 'SERVER LISTENING ON PORT 8000', badge: true });
+            });
+            process.on('beforeExit', function () {
+                consola.info({ message: 'CONNECTION CLOSING', badge: true });
+                connection.close();
+            });
         });
-    }); });
-    app.post('/api/products', function (req, res) { return __awaiter(void 0, void 0, void 0, function () {
-        var product, result, error_2;
-        return __generator(this, function (_a) {
-            switch (_a.label) {
-                case 0:
-                    _a.trys.push([0, 3, , 4]);
-                    return [4 /*yield*/, productRepository.create({
-                            title: req.body.title,
-                            image: req.body.image
-                        })];
-                case 1:
-                    product = _a.sent();
-                    return [4 /*yield*/, productRepository.save(product)];
-                case 2:
-                    result = _a.sent();
-                    res.json({ type: true, data: result });
-                    return [3 /*break*/, 4];
-                case 3:
-                    error_2 = _a.sent();
-                    res.json({ type: false, data: error_2.message });
-                    return [3 /*break*/, 4];
-                case 4: return [2 /*return*/];
-            }
-        });
-    }); });
-    app.get('/api/products/:id', function (req, res) { return __awaiter(void 0, void 0, void 0, function () {
-        var product, error_3;
-        return __generator(this, function (_a) {
-            switch (_a.label) {
-                case 0:
-                    _a.trys.push([0, 2, , 3]);
-                    return [4 /*yield*/, productRepository.findOne({ where: { id: parseInt(req.params.id, 10) } })];
-                case 1:
-                    product = _a.sent();
-                    res.json({ type: true, data: product });
-                    return [3 /*break*/, 3];
-                case 2:
-                    error_3 = _a.sent();
-                    res.json({ type: false, data: error_3.message });
-                    return [3 /*break*/, 3];
-                case 3: return [2 /*return*/];
-            }
-        });
-    }); });
-    app.put('/api/products/:id', function (req, res) { return __awaiter(void 0, void 0, void 0, function () {
-        var product, result, error_4;
-        return __generator(this, function (_a) {
-            switch (_a.label) {
-                case 0:
-                    _a.trys.push([0, 3, , 4]);
-                    return [4 /*yield*/, productRepository.findOne({ where: { id: parseInt(req.params.id, 10) } })];
-                case 1:
-                    product = _a.sent();
-                    productRepository.merge(product, req.body);
-                    return [4 /*yield*/, productRepository.save(product)];
-                case 2:
-                    result = _a.sent();
-                    res.json({ type: true, data: result });
-                    return [3 /*break*/, 4];
-                case 3:
-                    error_4 = _a.sent();
-                    res.json({ type: false, data: error_4.message });
-                    return [3 /*break*/, 4];
-                case 4: return [2 /*return*/];
-            }
-        });
-    }); });
-    app.delete('/api/products/:id', function (req, res) { return __awaiter(void 0, void 0, void 0, function () {
-        var result, error_5;
-        return __generator(this, function (_a) {
-            switch (_a.label) {
-                case 0:
-                    _a.trys.push([0, 2, , 3]);
-                    return [4 /*yield*/, productRepository.delete(req.params.id)];
-                case 1:
-                    result = _a.sent();
-                    res.json({ type: true, data: result });
-                    return [3 /*break*/, 3];
-                case 2:
-                    error_5 = _a.sent();
-                    res.json({ type: false, data: error_5.message });
-                    return [3 /*break*/, 3];
-                case 3: return [2 /*return*/];
-            }
-        });
-    }); });
-    app.post('/api/products/:id/like', function (req, res) { return __awaiter(void 0, void 0, void 0, function () {
-        var product, result, error_6;
-        return __generator(this, function (_a) {
-            switch (_a.label) {
-                case 0:
-                    _a.trys.push([0, 3, , 4]);
-                    return [4 /*yield*/, productRepository.findOne({ where: { id: parseInt(req.params.id, 10) } })];
-                case 1:
-                    product = _a.sent();
-                    product.likes++;
-                    return [4 /*yield*/, productRepository.save(product)];
-                case 2:
-                    result = _a.sent();
-                    res.json({ type: true, data: result });
-                    return [3 /*break*/, 4];
-                case 3:
-                    error_6 = _a.sent();
-                    res.json({ type: false, data: error_6.message });
-                    return [3 /*break*/, 4];
-                case 4: return [2 /*return*/];
-            }
-        });
-    }); });
-    app.listen(8000, function () {
-        console.info("SERVER LISTENING ON PORT 8000");
     });
 });
